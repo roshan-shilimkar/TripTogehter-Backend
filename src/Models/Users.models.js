@@ -1,64 +1,51 @@
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcrypt";
 import JWT from "jsonwebtoken";
+import { type } from "os";
+import crypto from "crypto";
 
 const Users = new Schema({
     FirstName: {
         type: String,
-        require: true,
+        required: true,
         trim: true,
-
     },
     LastName: {
         type: String,
-        require: true,
+        required: true,
         trim: true,
     },
     MobNo: {
         type: String,
-        require: true,
+        required: true,
         unique: true
-    },
-    Email: {
-        type: String,
-        // required: true,
-        unique: true,
-        trim: true,
-        lowercase: true,
-    },
-    role: {
-        type: String,
-        require: true,
     },
     Password: {
         type: String,
         required: true,
-    },
-    isEmailVerified: {
-        type: Boolean,
-        default: false
-    },
-    AuthTokens: [{
-        token: { type: String, required: true },
-        createdAt: { type: Date, default: Date.now }
-    }],
-    refreshtoken: {
-        type: String,
-    },
-    ForgotPasswordToken: {
-        type: String,
-    },
-    ForgotPasswordExpiry: {
-        type: Date,
-    },
-    EmailVerificationToken: {
-        type: String,
-    },
-    EmailVerificationExpiry: {
-        type: Date,
-    },
+    }
 }, {
     timestamps: true
+})
+
+const User_sessions = new Schema({
+    MobNo: {
+        type: String,
+        required: true
+    },
+    DeviceID: {
+        type: String,
+        required: true,
+    },
+    RefreshTokenHash: {
+        type: String,
+        required: true,
+        unique: true
+    },
+    Active: {
+        type: Boolean,
+        required: true,
+    }
 })
 
 Users.pre("save", async function (next) {
@@ -72,35 +59,46 @@ Users.pre("save", async function (next) {
     }
 });
 
+User_sessions.pre("save", async function (next) {
+    try {
+        if (!this.isModified("RefreshTokenHash")) return next();
+        this.RefreshTokenHash= crypto
+            .createHash('sha256')
+            .update(this.RefreshTokenHash)
+            .digest('hex');
+        next();
+    } catch (err) {
+        next(err);
+    }
+});
+
+
 Users.methods.checkpassword = async function (Password) {
     return await bcrypt.compare(Password, this.Password);
 }
 
-Users.methods.generateAccessToken = async function () {
-    console.log("come in statt");
-    const tokens = await JWT.sign({
+
+
+Users.methods.generateAccessToken = function () {
+    return JWT.sign({
         _id: this._id,
-        Username: this.Usernamem,
-        email: this.email
+        MobNo: this.MobNo,
     },
         process.env.ACCESS_TOKEN_SEC,
-        { expiresIn: "1d" });
-
-        console.log("tokens",tokens);
-    this.AuthTokens.push({ token: tokens });
-    await this.save();
-    console.log("come in enddd");
-
-    return tokens;
+        { expiresIn: process.env.ACCESS_TOKEN_EXP });
 }
 
-Users.methods.generateRefreshToken = async function () {
-    return await JWT.sign({
-        _id: this._id,
-    },
+
+
+User_sessions.statics.generateRefreshToken = function (payload) {
+    return JWT.sign(payload,
         process.env.REFRESH_TOKEN_SEC,
         { expiresIn: process.env.REFRESH_TOKEN_EXP })
 }
 
+
+
 export const User = mongoose.model("Users", Users)
+export const UserSession = mongoose.model("User_Session", User_sessions)
+
 

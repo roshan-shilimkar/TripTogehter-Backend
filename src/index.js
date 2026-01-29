@@ -2,9 +2,9 @@ import express from "express";
 import dotenv from "dotenv";
 import CORS from "cors";
 import connectDb from "./db/db.js";
-import router from "./routes/HealthCheck.routes.js";
+// import router from "./routes/HealthCheck.routes.js";
 import userroutes from "./routes/user.routes.js";
-import UserPostsRoutes from "./routes/userpost.routes.js";
+// import UserPostsRoutes from "./routes/userpost.routes.js";
 import {Authmiddleware} from "./middlewares/Auth.middkewares.js"
 
 
@@ -34,15 +34,13 @@ app.use(CORS(
     }))
 
 
-// R s
-app.use("/api/healthcheckup", router);
+// Rs
+// app.use("/api/healthcheckup", router);
 
 app.use("/api/user", userroutes);
 
-app.use("/api/post", Authmiddleware, UserPostsRoutes);
+// app.use("/api/post",Authmiddleware, UserPostsRoutes);
 
 app.listen(PORT, () => {
     console.log("app is listing on port :" + PORT)
 })
-
-console.log("asdas", PORT)

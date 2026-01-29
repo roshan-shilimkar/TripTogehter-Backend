@@ -1,8 +1,8 @@
-import express from "express";
-import {getallpostbyID} from "../controllers/UserPosts.controller.js"
+// import express from "express";
+// import {getallpostbyID} from "../controllers/UserPosts.controller.js"
 
-const UserPostsRoutes = express.Router();
+// const UserPostsRoutes = express.Router();
 
-UserPostsRoutes.get("/getAllpost", getallpostbyID);
+// UserPostsRoutes.get("/getAllpost", getallpostbyID);
 
-export default UserPostsRoutes;
+// export default UserPostsRoutes;
