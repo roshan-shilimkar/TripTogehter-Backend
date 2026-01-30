@@ -1,5 +1,5 @@
 import { User, UserSession } from "../Models/Users.models.js";
-import { OTPDatabase } from "../Models/OTP.modles.js";
+import { OTPDatabase } from "../Models/OTP.models.js";
 import JWT from "jsonwebtoken";
 
 
