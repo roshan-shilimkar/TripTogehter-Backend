@@ -17,7 +17,6 @@ const loginuser = async (req, res) => {
                 MobNo: MobNo,
                 Active: true
             });
-            console.log("refreshtokenDevices", refreshtokenDevices);
 
 
             let c_device = refreshtokenDevices.find(
@@ -141,7 +140,7 @@ const refreshAccessToken = async (req, res) => {
 const GetOTP = async (req, res) => {
     try {
         const { MobNo, Purpose } = req.body;
-        let existingUser = await User.findOne({ MobileNo: MobNo });
+        let existingUser = await User.findOne({ MobNo: MobNo });
         if (Purpose == 'FORGOTPASS' && !existingUser) {
             return res.status(500).json({ Message: "User Not Found" });
         }
@@ -150,7 +149,7 @@ const GetOTP = async (req, res) => {
             return res.status(500).json({ Message: "User already exist" });
         }
 
-        let existingotp = await OTPDatabase.findOne({ $and: [{ MobileNo: MobNo }, { Purpose: Purpose }] });
+        let existingotp = await OTPDatabase.findOne({ $and: [{ MobNo: MobNo }, { Purpose: Purpose }] });
 
         if (existingotp && existingotp.verified) {
             let deleteotp = await OTPDatabase.deleteOne({ _id: existingotp._id });
@@ -171,18 +170,18 @@ const GetOTP = async (req, res) => {
             existingotp.lastSentAt = new Date();
             existingotp.expireAt = new Date(Date.now() + 5 * 60 * 1000);
             await existingotp.save();
-            return res.status(201).json({ Message: "OTP has been Resend to " + existingotp.MobileNo, OTP: NewOTP });
+            return res.status(201).json({ Message: "OTP has been Resend to " + existingotp.MobNo, OTP: NewOTP });
         }
         else {
             let saveOTP = await OTPDatabase.create({
-                MobileNo: MobNo,
+                MobNo: MobNo,
                 Purpose: Purpose,
                 HashedOTP: NewOTP,
                 expireAt: new Date(Date.now() + 5 * 60 * 1000),
                 verified: false,
                 lastSentAt: new Date()
             });
-            return res.status(201).json({ Message: "OTP has been Send to " + saveOTP.MobileNo, OTP: NewOTP });
+            return res.status(201).json({ Message: "OTP has been Send to " + saveOTP.MobNo, OTP: NewOTP });
         }
     }
     catch (err) {
@@ -194,9 +193,8 @@ const GetOTP = async (req, res) => {
 
 const verifyOTP = async (req, res) => {
     try {
-        console.log('req.body = ', req.body);
         const { firstName, lastName, MobNo, Password, Purpose, OTP } = req.body;
-        let existingotp = await OTPDatabase.findOne({ $and: [{ MobileNo: MobNo }, { Purpose: Purpose }] });
+        let existingotp = await OTPDatabase.findOne({ $and: [{ MobNo: MobNo }, { Purpose: Purpose }] });
         if (!existingotp) {
             return res.status(401).json({ message: "Internal Server Error" });
         }
@@ -232,8 +230,6 @@ const logout = async (req, res) => {
         if (!Refreshtoken) {
             return res.status(401).json({ Message: "Invalid Session" });
         }
-
-
         let HashIncomingRefrToken = crypto
             .createHash('sha256')
             .update(Refreshtoken)
@@ -266,5 +262,5 @@ const logout = async (req, res) => {
 function generateotp() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
-export { loginuser, GetOTP, verifyOTP }
+export { loginuser, GetOTP, verifyOTP, logout, refreshAccessToken }
 
