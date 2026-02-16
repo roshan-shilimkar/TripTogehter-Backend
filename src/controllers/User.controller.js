@@ -8,7 +8,7 @@ const loginuser = async (req, res) => {
         const { MobNo, Password, deviceId } = req.body;
         const userdata = await User.findOne({ MobNo: MobNo });
         if (!userdata) {
-            return res.status(401).json({ message: "Incorrect User ID" });
+            return res.status(401).json({ message: "Invalid login credentials." });
         }
 
         const isMatch = await userdata.checkpassword(Password);
@@ -25,7 +25,7 @@ const loginuser = async (req, res) => {
             if (refreshtokenDevices.length >= 3 && !c_device) {
                 return res.status(403).json({
                     code: 'DEVICE_LIMIT_REACHED',
-                    message: 'You are already logged in on 3 devices'
+                    message: 'You are already logged in on 3 devices.'
                 });
             }
 
