@@ -15,7 +15,7 @@ const Users = new Schema({
         required: true,
         trim: true,
     },
-    MobNo: {
+    MobileNo: {
         type: String,
         required: true,
         unique: true
@@ -29,9 +29,9 @@ const Users = new Schema({
 })
 
 const User_sessions = new Schema({
-    MobNo: {
+    MobileNo: {
         type: String,
-        required: true
+        required: true,
     },
     DeviceID: {
         type: String,
@@ -45,7 +45,16 @@ const User_sessions = new Schema({
     Active: {
         type: Boolean,
         required: true,
+    },
+    LoginAt: {
+        type: Date,
+        required: true,
+    },
+    LogoutAt: {
+        type: Date,
     }
+}, {
+    timestamps: true,
 })
 
 Users.pre("save", async function (next) {
@@ -62,7 +71,7 @@ Users.pre("save", async function (next) {
 User_sessions.pre("save", async function (next) {
     try {
         if (!this.isModified("RefreshTokenHash")) return next();
-        this.RefreshTokenHash= crypto
+        this.RefreshTokenHash = crypto
             .createHash('sha256')
             .update(this.RefreshTokenHash)
             .digest('hex');
@@ -82,7 +91,7 @@ Users.methods.checkpassword = async function (Password) {
 Users.methods.generateAccessToken = function () {
     return JWT.sign({
         _id: this._id,
-        MobNo: this.MobNo,
+        MobileNo: this.MobileNo,
     },
         process.env.ACCESS_TOKEN_SEC,
         { expiresIn: process.env.ACCESS_TOKEN_EXP });

@@ -3,7 +3,8 @@ import dotenv from "dotenv";
 import CORS from "cors";
 import connectDb from "./db/db.js";
 import userroutes from "./routes/User.routes.js";
-import { Authmiddleware } from "./middlewares/Auth.middkewares.js"
+import triproutes from "./routes/Trip.routes.js";
+import { Authmiddleware } from "./middlewares/Auth.middleware.js";
 
 
 dotenv.config({
@@ -36,6 +37,8 @@ app.use(CORS(
 
 // Login Module
 app.use("/api/user", userroutes);
+
+app.use("/api/trip", Authmiddleware, triproutes);
 
 app.listen(PORT, () => {
     console.log("app is listing on port :" + PORT)

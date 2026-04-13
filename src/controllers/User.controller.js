@@ -1,20 +1,22 @@
 import { User, UserSession } from "../Models/Users.models.js";
 import { OTPDatabase } from "../Models/OTP.models.js";
 import JWT from "jsonwebtoken";
+import crypto from 'crypto';
 
 
 const loginuser = async (req, res) => {
     try {
-        const { MobNo, Password, deviceId } = req.body;
-        const userdata = await User.findOne({ MobNo: MobNo });
+        const { MobileNo, Password, deviceId } = req.body;
+        console.log(MobileNo, Password, deviceId);
+        const userdata = await User.findOne({ MobileNo: MobileNo });
         if (!userdata) {
-            return res.status(401).json({ message: "Invalid login credentials." });
+            return res.status(401).json({ ShowMsg: true, message: "Invalid login credentials." });
         }
 
         const isMatch = await userdata.checkpassword(Password);
         if (isMatch) {
             const refreshtokenDevices = await UserSession.find({
-                MobNo: MobNo,
+                MobileNo: MobileNo,
                 Active: true
             });
 
@@ -22,31 +24,41 @@ const loginuser = async (req, res) => {
             let c_device = refreshtokenDevices.find(
                 s => s.DeviceID === deviceId
             )
-            if (refreshtokenDevices.length >= 3 && !c_device) {
-                return res.status(403).json({
-                    code: 'DEVICE_LIMIT_REACHED',
-                    message: 'You are already logged in on 3 devices.'
-                });
-            }
 
 
             const refreshToken = await UserSession.generateRefreshToken({
-                MobNo: MobNo,
+                MobileNo: MobileNo,
                 DeviceID: deviceId
             })
 
 
+            console.log(refreshToken);
+            let HashRefrToken = crypto
+                .createHash('sha256')
+                .update(refreshToken)
+                .digest('hex');
 
+
+            // c_device will be true when user try to login from same device
             if (!c_device) {
+                // if c_device false
                 let newRefreshSession = await UserSession.create({
-                    MobNo: MobNo,
+                    MobileNo: MobileNo,
                     DeviceID: deviceId,
-                    RefreshTokenHash: refreshToken,
-                    Active: true
-                })
+                    RefreshTokenHash: HashRefrToken,
+                    Active: true,
+                    LoginAt: Date.now()
+                });
+
+                await UserSession.updateOne(
+                    { _id: refreshtokenDevices._id },
+                    { $set: { Active: false, LogoutAt: Date.now() } }
+                );
+
             }
             else {
                 c_device.RefreshTokenHash = refreshToken;
+                c_device.LoginAt = Date.now();
                 await c_device.save();
             }
 
@@ -65,7 +77,7 @@ const loginuser = async (req, res) => {
                     Usersdata: {
                         FirstName: userdata.FirstName,
                         LastName: userdata.LastName,
-                        MobNo: userdata.MobNo,
+                        MobileNo: userdata.MobileNo,
                         AccessToken: accesstoken,
                     }
                 });
@@ -83,7 +95,8 @@ const loginuser = async (req, res) => {
 
 const refreshAccessToken = async (req, res) => {
     try {
-        let Refreshtoken = req.cookies.refreshToken;
+        console.log("req.cookies",req?.cookies);
+        let Refreshtoken = req?.cookies?.refreshToken;
         if (!Refreshtoken) {
             return res.status(401).json({ message: 'No refresh token' });
         }
@@ -96,7 +109,7 @@ const refreshAccessToken = async (req, res) => {
         } catch (e) {
             return res.status(403).json({ message: 'Invalid refresh token' });
         }
-        const userdata = await User.findOne({ MobNo: decodedToken.MobNo });
+        const userdata = await User.findOne({ MobileNo: decodedToken.MobileNo });
         let HashIncomingRefrToken = crypto
             .createHash('sha256')
             .update(Refreshtoken)
@@ -115,7 +128,7 @@ const refreshAccessToken = async (req, res) => {
 
         const accesstoken = await userdata.generateAccessToken();
         const refreshToken = await UserSession.generateRefreshToken({
-            MobNo: decodedToken.MobNo,
+            MobileNo: decodedToken.MobileNo,
             DeviceID: decodedToken.DeviceID
         })
 
@@ -139,8 +152,8 @@ const refreshAccessToken = async (req, res) => {
 
 const GetOTP = async (req, res) => {
     try {
-        const { MobNo, Purpose } = req.body;
-        let existingUser = await User.findOne({ MobNo: MobNo });
+        const { MobileNo, Purpose } = req.body;
+        let existingUser = await User.findOne({ MobileNo: MobileNo });
         if (Purpose == 'FORGOTPASS' && !existingUser) {
             return res.status(500).json({ Message: "User Not Found" });
         }
@@ -149,7 +162,7 @@ const GetOTP = async (req, res) => {
             return res.status(500).json({ Message: "User already exist" });
         }
 
-        let existingotp = await OTPDatabase.findOne({ $and: [{ MobNo: MobNo }, { Purpose: Purpose }] });
+        let existingotp = await OTPDatabase.findOne({ $and: [{ MobileNo: MobileNo }, { Purpose: Purpose }] });
 
         if (existingotp && existingotp.verified) {
             let deleteotp = await OTPDatabase.deleteOne({ _id: existingotp._id });
@@ -170,18 +183,18 @@ const GetOTP = async (req, res) => {
             existingotp.lastSentAt = new Date();
             existingotp.expireAt = new Date(Date.now() + 5 * 60 * 1000);
             await existingotp.save();
-            return res.status(201).json({ Message: "OTP has been Resend to " + existingotp.MobNo, OTP: NewOTP });
+            return res.status(201).json({ Message: "OTP has been Resend to " + existingotp.MobileNo, OTP: NewOTP });
         }
         else {
             let saveOTP = await OTPDatabase.create({
-                MobNo: MobNo,
+                MobileNo: MobileNo,
                 Purpose: Purpose,
                 HashedOTP: NewOTP,
                 expireAt: new Date(Date.now() + 5 * 60 * 1000),
                 verified: false,
                 lastSentAt: new Date()
             });
-            return res.status(201).json({ Message: "OTP has been Send to " + saveOTP.MobNo, OTP: NewOTP });
+            return res.status(201).json({ Message: "OTP has been send to " + saveOTP.MobileNo, OTP: NewOTP });
         }
     }
     catch (err) {
@@ -193,8 +206,8 @@ const GetOTP = async (req, res) => {
 
 const verifyOTP = async (req, res) => {
     try {
-        const { firstName, lastName, MobNo, Password, Purpose, OTP } = req.body;
-        let existingotp = await OTPDatabase.findOne({ $and: [{ MobNo: MobNo }, { Purpose: Purpose }] });
+        const { firstName, lastName, MobileNo, Password, Purpose, OTP } = req.body;
+        let existingotp = await OTPDatabase.findOne({ $and: [{ MobileNo: MobileNo }, { Purpose: Purpose }] });
         if (!existingotp) {
             return res.status(401).json({ message: "Internal Server Error" });
         }
@@ -202,16 +215,16 @@ const verifyOTP = async (req, res) => {
         if (isMatch) {
             let deleteotp = await OTPDatabase.deleteOne({ _id: existingotp._id });
             if (Purpose == "FORGOTPASS") {
-                return res.status(201).json({ Message: "OTP Verified" });
+                return res.status(200).json({ Message: "OTP Verified" });
             }
-            if (Purpose == "REGISTRATION") {
+            else if (Purpose == "REGISTRATION") {
                 const user = await User.create({
                     FirstName: firstName,
                     LastName: lastName,
-                    MobNo: MobNo,
+                    MobileNo: MobileNo,
                     Password: Password
                 })
-                return res.status(201).json({ Message: "New User Created", _id: user._id });
+                return res.status(201).json({ Message: "Signedup Successfully.", _id: user._id });
             }
         }
         else {
@@ -223,6 +236,25 @@ const verifyOTP = async (req, res) => {
         return res.status(500).json({ Message: err });
     }
 }
+
+const ChangePassword = async (req, res) => {
+    try {
+        const { MobileNo, Password } = req.body;
+        console.log(MobileNo, Password);
+        let Userdata = await User.findOne({ MobileNo: MobileNo });
+        if (Userdata) {
+            Userdata.Password = Password;
+            Userdata.save();
+            return res.status(200).json({ Message: "Password Change Successfully." });
+        }
+    }
+    catch (err) {
+        console.log(err);
+        return res.status(500).json({ Message: err });
+    }
+
+}
+
 
 const logout = async (req, res) => {
     try {
@@ -262,5 +294,5 @@ const logout = async (req, res) => {
 function generateotp() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
-export { loginuser, GetOTP, verifyOTP, logout, refreshAccessToken }
+export { loginuser, GetOTP, verifyOTP, logout, refreshAccessToken, ChangePassword }
 
