@@ -41,5 +41,5 @@ app.use("/api/user", userroutes);
 app.use("/api/trip", Authmiddleware, triproutes);
 
 app.listen(PORT, () => {
-    console.log("app is listing on port :" + PORT)
+    console.log("app is listing on port :" + PORT);
 })

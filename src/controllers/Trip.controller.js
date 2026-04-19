@@ -1,13 +1,12 @@
 import { tripmodel } from '../Models/Trip.models.js';
+import { ErrorResponse, SuccessResponse } from './Response.js';
 
 const Createtrip = async (req, res) => {
     try {
-        console.log("Come in Create Trip");
 
         const { tripGroupName, tripGroupDesc, tripstartDate, tripendDate } = req.body;
         const userData = req.userData;
 
-        console.log(tripGroupName, tripGroupDesc, tripstartDate, tripendDate, userData);
 
         const tripgrp = await tripmodel.create({
             GroupName: tripGroupName,
@@ -19,29 +18,24 @@ const Createtrip = async (req, res) => {
             StartDate: tripstartDate,
             EndDate: tripendDate,
         });
-        return res.status(200).json({ Message: "Group Created Successfully." })
+        return SuccessResponse(res, 200, null, true, "Group Created Successfully.");
     }
     catch (err) {
-        return res.status(500).json({
-            Message: err
-        })
+        return ErrorResponse(res, 500, false, err);
     }
 }
 
 const GetTrips = async (req, res) => {
     try {
         const userData = req.userData;
-        console.log("user data gettrip",userData);
         const Trips = await tripmodel.find({
             "Members.UserId": userData._id
         });
 
-        return res.status(200).json({ ResponseData: Trips })
+        return SuccessResponse(res, 200, Trips);
     }
     catch (err) {
-        return res.status(500).json({
-            Message: err
-        })
+        return ErrorResponse(res, 500, false, err);
     }
 }
 

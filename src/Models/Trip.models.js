@@ -45,6 +45,7 @@ const Trip = new Schema({
         required: true,
         default: Date.now
     },
+    
 });
 
 export const tripmodel = mongoose.model("TripModel",Trip)

@@ -2,15 +2,15 @@ import { User, UserSession } from "../Models/Users.models.js";
 import { OTPDatabase } from "../Models/OTP.models.js";
 import JWT from "jsonwebtoken";
 import crypto from 'crypto';
+import { ErrorResponse, SuccessResponse } from "./Response.js";
 
 
 const loginuser = async (req, res) => {
     try {
         const { MobileNo, Password, deviceId } = req.body;
-        console.log(MobileNo, Password, deviceId);
         const userdata = await User.findOne({ MobileNo: MobileNo });
         if (!userdata) {
-            return res.status(401).json({ ShowMsg: true, message: "Invalid login credentials." });
+            return ErrorResponse(res, 401, "Invalid login credentials.");
         }
 
         const isMatch = await userdata.checkpassword(Password);
@@ -31,8 +31,6 @@ const loginuser = async (req, res) => {
                 DeviceID: deviceId
             })
 
-
-            console.log(refreshToken);
             let HashRefrToken = crypto
                 .createHash('sha256')
                 .update(refreshToken)
@@ -71,34 +69,28 @@ const loginuser = async (req, res) => {
                 maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
             });
 
-            return res.status(200)
-                .json({
-                    message: "Login Success",
-                    Usersdata: {
-                        FirstName: userdata.FirstName,
-                        LastName: userdata.LastName,
-                        MobileNo: userdata.MobileNo,
-                        AccessToken: accesstoken,
-                    }
-                });
+            return SuccessResponse(res, 200, {
+                FirstName: userdata.FirstName,
+                LastName: userdata.LastName,
+                MobileNo: userdata.MobileNo,
+                AccessToken: accesstoken,
+            })
         }
         else {
-            return res.status(401).json({ message: "Invalid crediential" });
+            return ErrorResponse(res, 401, "Invalid crediential");
         }
     }
     catch (err) {
-        console.log(err);
-        return res.status(401).json({ Message: err });
+        return ErrorResponse(res, 401, err);
     }
 }
 
 
 const refreshAccessToken = async (req, res) => {
     try {
-        console.log("req.cookies",req?.cookies);
         let Refreshtoken = req?.cookies?.refreshToken;
         if (!Refreshtoken) {
-            return res.status(401).json({ message: 'No refresh token' });
+            return ErrorResponse(res, 401, "No refresh token");
         }
         let decodedToken;
         try {
@@ -107,7 +99,8 @@ const refreshAccessToken = async (req, res) => {
                 process.env.REFRESH_TOKEN_SEC
             );
         } catch (e) {
-            return res.status(403).json({ message: 'Invalid refresh token' });
+            return ErrorResponse(res, 403, 'Invalid refresh token');
+
         }
         const userdata = await User.findOne({ MobileNo: decodedToken.MobileNo });
         let HashIncomingRefrToken = crypto
@@ -122,7 +115,7 @@ const refreshAccessToken = async (req, res) => {
         })
 
         if (!refreshtokendb) {
-            return res.status(403).json({ Message: 'Invalid refresh token' });
+            return ErrorResponse(res, 403, 'Invalid refresh token');
         }
 
 
@@ -141,11 +134,11 @@ const refreshAccessToken = async (req, res) => {
             sameSite: 'strict',  // or 'lax'
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         })
-        return res.status(200).json({ AccessToken: accesstoken })
+        return SuccessResponse(res, 200, accesstoken);
     }
     catch (err) {
-        console.log(err);
-        return res.status(401).json({ Message: err });
+        return ErrorResponse(res, 401, err);
+
     }
 }
 
@@ -155,11 +148,11 @@ const GetOTP = async (req, res) => {
         const { MobileNo, Purpose } = req.body;
         let existingUser = await User.findOne({ MobileNo: MobileNo });
         if (Purpose == 'FORGOTPASS' && !existingUser) {
-            return res.status(500).json({ Message: "User Not Found" });
+            return ErrorResponse(res, 500, "User Not Found");
         }
 
         if (Purpose == 'REGISTRATION' && existingUser) {
-            return res.status(500).json({ Message: "User already exist" });
+            return ErrorResponse(res, 500, "User already exist");
         }
 
         let existingotp = await OTPDatabase.findOne({ $and: [{ MobileNo: MobileNo }, { Purpose: Purpose }] });
@@ -172,18 +165,18 @@ const GetOTP = async (req, res) => {
 
         if (existingotp) {
             if (existingotp.Resendattempts >= existingotp.ResendLimit) {
-                return res.status(500).json({ Message: "Resend limit exceeded. Try later." });
+                return ErrorResponse(res, 500, "Resend limit exceeded. Try later.");
             }
             const now = Date.now();
             if (existingotp.lastSentAt && now - existingotp.lastSentAt < 30 * 1000) {
-                return res.status(429).json({ Message: "Please wait before resending OTP." });
+                return ErrorResponse(res, 429, "Please wait before resending OTP.");
             }
             existingotp.Resendattempts += 1;
             existingotp.HashedOTP = NewOTP;
             existingotp.lastSentAt = new Date();
             existingotp.expireAt = new Date(Date.now() + 5 * 60 * 1000);
             await existingotp.save();
-            return res.status(201).json({ Message: "OTP has been Resend to " + existingotp.MobileNo, OTP: NewOTP });
+            return SuccessResponse(res, 201, NewOTP, true, "OTP has been Resend to " + existingotp.MobileNo);
         }
         else {
             let saveOTP = await OTPDatabase.create({
@@ -194,12 +187,11 @@ const GetOTP = async (req, res) => {
                 verified: false,
                 lastSentAt: new Date()
             });
-            return res.status(201).json({ Message: "OTP has been send to " + saveOTP.MobileNo, OTP: NewOTP });
+            return SuccessResponse(res, 201, NewOTP, true, "OTP has been send to " + saveOTP.MobileNo);
         }
     }
     catch (err) {
-        console.log(err);
-        return res.status(500).json({ Message: err });
+        return ErrorResponse(res, 500, err);
     }
 }
 
@@ -209,13 +201,14 @@ const verifyOTP = async (req, res) => {
         const { firstName, lastName, MobileNo, Password, Purpose, OTP } = req.body;
         let existingotp = await OTPDatabase.findOne({ $and: [{ MobileNo: MobileNo }, { Purpose: Purpose }] });
         if (!existingotp) {
-            return res.status(401).json({ message: "Internal Server Error" });
+            return ErrorResponse(res, 401, "Internal Server Error");
+
         }
         const isMatch = await existingotp.verifyOTP(OTP);
         if (isMatch) {
             let deleteotp = await OTPDatabase.deleteOne({ _id: existingotp._id });
             if (Purpose == "FORGOTPASS") {
-                return res.status(200).json({ Message: "OTP Verified" });
+                return SuccessResponse(res, 200);
             }
             else if (Purpose == "REGISTRATION") {
                 const user = await User.create({
@@ -223,34 +216,32 @@ const verifyOTP = async (req, res) => {
                     LastName: lastName,
                     MobileNo: MobileNo,
                     Password: Password
-                })
-                return res.status(201).json({ Message: "Signedup Successfully.", _id: user._id });
+                });
+                return SuccessResponse(res, 201, '', true, "Signedup Successfully.")
             }
         }
         else {
-            return res.status(401).json({ message: "Invalid OTP" });
+            return ErrorResponse(res, 401, "Invalid OTP.");
+
         }
     }
     catch (err) {
-        console.log(err);
-        return res.status(500).json({ Message: err });
+        return ErrorResponse(res, 500, err);
     }
 }
 
 const ChangePassword = async (req, res) => {
     try {
         const { MobileNo, Password } = req.body;
-        console.log(MobileNo, Password);
         let Userdata = await User.findOne({ MobileNo: MobileNo });
         if (Userdata) {
             Userdata.Password = Password;
             Userdata.save();
-            return res.status(200).json({ Message: "Password Change Successfully." });
+            return SuccessResponse(res, 200, '', true, "Password Change Successfully.");
         }
     }
     catch (err) {
-        console.log(err);
-        return res.status(500).json({ Message: err });
+        return ErrorResponse(res, 500, err);
     }
 
 }
@@ -260,7 +251,7 @@ const logout = async (req, res) => {
     try {
         const Refreshtoken = req.cookies.refreshToken;
         if (!Refreshtoken) {
-            return res.status(401).json({ Message: "Invalid Session" });
+            return ErrorResponse(res, 401, "Invalid Session.");
         }
         let HashIncomingRefrToken = crypto
             .createHash('sha256')
@@ -272,7 +263,8 @@ const logout = async (req, res) => {
             Active: true
         });
         if (!refreshtokendb) {
-            return res.status(401).json({ Message: "Invalid Session" });
+            return ErrorResponse(res, 401, "Invalid Session.");
+
         }
         await UserSession.updateOne(
             { _id: refreshtokendb._id },
@@ -286,8 +278,7 @@ const logout = async (req, res) => {
         res.status(200).json({ message: 'Logged out successfully' });
     }
     catch (err) {
-        console.log(err);
-        return res.status(500).json({ Message: err });
+        return ErrorResponse(res, 500, err);
     }
 }
 
