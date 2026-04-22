@@ -19,21 +19,25 @@ const Trip = new Schema({
         type: Date,
         required: true
     },
-    Members:[{
-      UserId:{
-        type:String,
-        required: true
-      },
-      AddedOn:{
-        type:Date,
-        required:true,
-        default:Date.now
-      },
-      Role:{
-        type:Number,
-        required:true,
-        default:0,
-      }
+    Members: [{
+        UserId: {
+            type: String,
+            required: true
+        },
+        UserName: {
+            type: String,
+            required: true
+        },
+        AddedOn: {
+            type: Date,
+            required: true,
+            default: Date.now
+        },
+        Role: {
+            type: Number,
+            required: true,
+            default: 0,
+        }
     }],
     CreateAt: {
         type: Date,
@@ -45,7 +49,7 @@ const Trip = new Schema({
         required: true,
         default: Date.now
     },
-    
+
 });
 
-export const tripmodel = mongoose.model("TripModel",Trip)
+export const tripmodel = mongoose.model("TripModel", Trip)

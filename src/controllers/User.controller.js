@@ -199,11 +199,15 @@ const GetOTP = async (req, res) => {
 const verifyOTP = async (req, res) => {
     try {
         const { firstName, lastName, MobileNo, Password, Purpose, OTP } = req.body;
+        console.log( firstName, lastName, MobileNo, Password, Purpose, OTP);
         let existingotp = await OTPDatabase.findOne({ $and: [{ MobileNo: MobileNo }, { Purpose: Purpose }] });
+        console.log("come here 0"); 
+        console.log("existingotp = ",existingotp);
         if (!existingotp) {
             return ErrorResponse(res, 401, "Internal Server Error");
-
         }
+
+        console.log("come here 1 ");
         const isMatch = await existingotp.verifyOTP(OTP);
         if (isMatch) {
             let deleteotp = await OTPDatabase.deleteOne({ _id: existingotp._id });
